@@ -24,110 +24,82 @@ import {
   Edit,
   Eye,
   Trash2,
-  User
+  User,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 
-type InventoryItem = {
+// Updated interface to match API response
+interface InventoryItem {
   id: number;
-  no: number;
-  product: string;
-  productId: string;
+  product_name: string;
+  product_id: string;
   category: string;
   location: string;
-  available: number;
-  reserved: number;
-  onHand: number;
-};
+  available_quantity: number;
+  reserved_quantity: number;
+  on_hand_quantity: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Display interface for table
+interface InventoryDisplayItem extends InventoryItem {
+  no: number;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  details?: string;
+  message?: string;
+  count?: number;
+}
 
 const InventoryDashboard = () => {
   const [activeNavItem, setActiveNavItem] = useState<string>('Inventory');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [submitLoading, setSubmitLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState({
-    product: '',
-    productId: '',
+    product_name: '',
+    product_id: '',
     category: '',
     location: '',
-    available: '',
-    reserved: '',
-    onHand: ''
+    available_quantity: '',
+    reserved_quantity: '',
+    on_hand_quantity: ''
   });
 
-  // Sample data to demonstrate the design (uncomment to see populated table)
-  useEffect(() => {
-    // Uncomment these lines to see the table with sample data like in the reference image
-    /*
-    const sampleData: InventoryItem[] = [
-      {
-        id: 1,
-        no: 1,
-        product: "Macbook Pro M1 2020",
-        productId: "#LWL102012",
-        category: "Laptop",
-        location: "Warehouse 1",
-        available: 120,
-        reserved: 120,
-        onHand: 100
-      },
-      {
-        id: 2,
-        no: 2,
-        product: "Mechanical Keyboard",
-        productId: "#LWL102013",
-        category: "Accessories",
-        location: "Warehouse 2",
-        available: 230,
-        reserved: 230,
-        onHand: 205
-      },
-      {
-        id: 3,
-        no: 3,
-        product: "Wired Mouse",
-        productId: "#LWL102014",
-        category: "Accessories",
-        location: "Warehouse 3",
-        available: 1230,
-        reserved: 1230,
-        onHand: 1130
-      },
-      {
-        id: 4,
-        no: 4,
-        product: "Titan Watch",
-        productId: "#LWL102015",
-        category: "Watch",
-        location: "Warehouse 4",
-        available: 600,
-        reserved: 600,
-        onHand: 560
-      },
-      {
-        id: 5,
-        no: 5,
-        product: "Sandisk Harddisk 1 TB",
-        productId: "#LWL102016",
-        category: "Accessories",
-        location: "Warehouse 3",
-        available: 250,
-        reserved: 250,
-        onHand: 190
-      },
-      {
-        id: 6,
-        no: 6,
-        product: "Iwatch 4th Generation 2022",
-        productId: "#LWL102017",
-        category: "Watch",
-        location: "Warehouse 5",
-        available: 158,
-        reserved: 158,
-        onHand: 128
+  // Fetch inventory items from API
+  const fetchInventoryItems = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const response = await fetch('/api/inventory');
+      const result: ApiResponse<InventoryItem[]> = await response.json();
+      
+      if (result.success && result.data) {
+        setInventoryItems(result.data);
+      } else {
+        setError(result.error || 'Failed to fetch inventory items');
       }
-    ];
-    setInventoryItems(sampleData);
-    */
+    } catch (err) {
+      setError('Network error occurred while fetching inventory items');
+      console.error('Error fetching inventory:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load inventory items on component mount
+  useEffect(() => {
+    fetchInventoryItems();
   }, []);
 
   // Auto-generate Product ID when modal opens
@@ -135,14 +107,14 @@ const InventoryDashboard = () => {
     if (showAddModal) {
       const generateProductId = () => {
         const prefix = '#LWL';
-        const timestamp = Date.now().toString().slice(-5);
-        const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        const timestamp = Date.now().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
         return `${prefix}${timestamp}${random}`;
       };
       
       setFormData(prev => ({
         ...prev,
-        productId: generateProductId()
+        product_id: generateProductId()
       }));
     }
   }, [showAddModal]);
@@ -155,51 +127,100 @@ const InventoryDashboard = () => {
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validate required fields
-    if (!formData.product || !formData.category || !formData.location || 
-        !formData.available || !formData.reserved || !formData.onHand) {
+    if (!formData.product_name || !formData.category || !formData.location || 
+        !formData.available_quantity || !formData.reserved_quantity || !formData.on_hand_quantity) {
+      setError('Please fill in all required fields');
       return;
     }
     
-    // Create new inventory item
-    const newItem: InventoryItem = {
-      id: Date.now(),
-      no: inventoryItems.length + 1,
-      product: formData.product,
-      productId: formData.productId,
-      category: formData.category,
-      location: formData.location,
-      available: parseInt(formData.available) || 0,
-      reserved: parseInt(formData.reserved) || 0,
-      onHand: parseInt(formData.onHand) || 0
-    };
-    
-    // Add to inventory list
-    setInventoryItems(prev => [...prev, newItem]);
-    
-    // Close modal and reset form
-    setShowAddModal(false);
-    setFormData({
-      product: '',
-      productId: '',
-      category: '',
-      location: '',
-      available: '',
-      reserved: '',
-      onHand: ''
-    });
+    try {
+      setSubmitLoading(true);
+      setError('');
+      
+      const requestData = {
+        product_name: formData.product_name,
+        product_id: formData.product_id,
+        category: formData.category,
+        location: formData.location,
+        available_quantity: parseInt(formData.available_quantity) || 0,
+        reserved_quantity: parseInt(formData.reserved_quantity) || 0,
+        on_hand_quantity: parseInt(formData.on_hand_quantity) || 0
+      };
+
+      const response = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      const result: ApiResponse<InventoryItem> = await response.json();
+
+      if (result.success && result.data) {
+        // Add new item to the list
+        setInventoryItems(prev => [result.data!, ...prev]);
+        
+        // Close modal and reset form
+        setShowAddModal(false);
+        setFormData({
+          product_name: '',
+          product_id: '',
+          category: '',
+          location: '',
+          available_quantity: '',
+          reserved_quantity: '',
+          on_hand_quantity: ''
+        });
+      } else {
+        setError(result.error || 'Failed to create inventory item');
+      }
+    } catch (err) {
+      setError('Network error occurred while creating inventory item');
+      console.error('Error creating inventory:', err);
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setInventoryItems(prev => prev.filter(item => item.id !== id));
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this inventory item?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/inventory/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result: ApiResponse<InventoryItem> = await response.json();
+
+      if (result.success) {
+        // Remove item from the list
+        setInventoryItems(prev => prev.filter(item => item.id !== id));
+      } else {
+        setError(result.error || 'Failed to delete inventory item');
+      }
+    } catch (err) {
+      setError('Network error occurred while deleting inventory item');
+      console.error('Error deleting inventory:', err);
+    }
   };
 
+  // Filter items based on search term
   const filteredItems = inventoryItems.filter(item =>
-    item.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.productId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.product_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Convert to display format with row numbers
+  const displayItems: InventoryDisplayItem[] = filteredItems.map((item, index) => ({
+    ...item,
+    no: index + 1
+  }));
 
   const navItems = [
     { icon: BarChart3, label: 'Dashboard', section: 'Main Menu' },
@@ -268,6 +289,20 @@ const InventoryDashboard = () => {
     return colorMap[category as keyof typeof colorMap] || 'bg-gray-100 text-gray-800';
   };
 
+  // Error Alert Component
+  const ErrorAlert = ({ message, onClose }: { message: string; onClose: () => void }) => (
+    <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
+      <AlertCircle className="text-red-500 mr-3" size={20} />
+      <span className="text-red-800 flex-1">{message}</span>
+      <button 
+        onClick={onClose}
+        className="text-red-500 hover:text-red-700 ml-2"
+      >
+        ×
+      </button>
+    </div>
+  );
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -321,6 +356,11 @@ const InventoryDashboard = () => {
 
         {/* Page Content */}
         <main className="flex-1 p-6 overflow-auto">
+          {/* Error Alert */}
+          {error && (
+            <ErrorAlert message={error} onClose={() => setError('')} />
+          )}
+
           {/* Page Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -349,6 +389,7 @@ const InventoryDashboard = () => {
               <div className="flex items-center">
                 <ClipboardList size={20} className="text-orange-600 mr-2" />
                 <h2 className="text-lg font-semibold text-gray-900">Inventory</h2>
+                {loading && <Loader2 size={16} className="ml-2 animate-spin text-orange-600" />}
               </div>
               <div className="flex items-center space-x-3">
                 <div className="relative">
@@ -388,49 +429,62 @@ const InventoryDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredItems.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center">
+                          <Loader2 size={32} className="text-orange-600 animate-spin mb-4" />
+                          <p className="text-gray-500">Loading inventory items...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : displayItems.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center">
                           <Package size={48} className="text-gray-300 mb-4" />
                           <p className="text-lg font-medium text-gray-400 mb-2">No inventory items found</p>
-                          <p className="text-sm text-gray-400">Add your first inventory item to get started</p>
-                          <button 
-                            onClick={() => setShowAddModal(true)}
-                            className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
-                          >
-                            Add First Item
-                          </button>
+                          <p className="text-sm text-gray-400">
+                            {searchTerm ? 'Try adjusting your search terms' : 'Add your first inventory item to get started'}
+                          </p>
+                          {!searchTerm && (
+                            <button 
+                              onClick={() => setShowAddModal(true)}
+                              className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm"
+                            >
+                              Add First Item
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredItems.map((item, index) => (
+                    displayItems.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <input type="checkbox" className="rounded border-gray-300" />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                          {String(index + 1).padStart(2, '0')}
+                          {String(item.no).padStart(2, '0')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
                               <span className="text-lg">{getCategoryIcon(item.category)}</span>
                             </div>
-                            <span className="text-sm font-medium text-gray-900">{item.product}</span>
+                            <span className="text-sm font-medium text-gray-900">{item.product_name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.productId}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.product_id}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(item.category)}`}>
                             {item.category}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.location}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.available.toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.reserved.toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.onHand.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.available_quantity.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.reserved_quantity.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{item.on_hand_quantity.toLocaleString()}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-1">
                             <button className="w-8 h-8 flex items-center justify-center bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors">
@@ -459,15 +513,15 @@ const InventoryDashboard = () => {
               <div className="flex items-center text-sm text-gray-500">
                 <span>Show 10</span>
                 <span className="mx-4">
-                  Showing {filteredItems.length > 0 ? '1' : '0'} to {Math.min(10, filteredItems.length)} of {filteredItems.length} entries
+                  Showing {displayItems.length > 0 ? '1' : '0'} to {Math.min(10, displayItems.length)} of {displayItems.length} entries
                 </span>
               </div>
               <div className="flex items-center space-x-1">
-                <button className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors" disabled={filteredItems.length === 0}>
+                <button className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors" disabled={displayItems.length === 0}>
                   <ChevronLeft size={16} />
                 </button>
                 <button className="px-3 py-2 bg-orange-600 text-white rounded-md">1</button>
-                <button className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors" disabled={filteredItems.length === 0}>
+                <button className="p-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors" disabled={displayItems.length === 0}>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -490,6 +544,7 @@ const InventoryDashboard = () => {
               <button
                 onClick={() => setShowAddModal(false)}
                 className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+                disabled={submitLoading}
               >
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -499,6 +554,13 @@ const InventoryDashboard = () => {
 
             {/* Modal Body - Scrollable */}
             <div className="flex-1 p-6 overflow-y-auto">
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center text-sm">
+                  <AlertCircle className="text-red-500 mr-2" size={16} />
+                  <span className="text-red-800">{error}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Product Name */}
                 <div className="md:col-span-2">
@@ -507,11 +569,12 @@ const InventoryDashboard = () => {
                   </label>
                   <input
                     type="text"
-                    name="product"
-                    value={formData.product}
+                    name="product_name"
+                    value={formData.product_name}
                     onChange={handleInputChange}
                     placeholder="Enter product name"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    disabled={submitLoading}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500 disabled:bg-gray-50"
                   />
                 </div>
 
@@ -522,8 +585,8 @@ const InventoryDashboard = () => {
                   </label>
                   <input
                     type="text"
-                    name="productId"
-                    value={formData.productId}
+                    name="product_id"
+                    value={formData.product_id}
                     onChange={handleInputChange}
                     placeholder="Auto-generated ID"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-700 placeholder-gray-500 bg-gray-50"
@@ -540,7 +603,8 @@ const InventoryDashboard = () => {
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
+                    disabled={submitLoading}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 disabled:bg-gray-50"
                   >
                     <option value="" disabled className="text-gray-500">Select category</option>
                     <option value="Laptop" className="text-gray-900">Laptop</option>
@@ -560,7 +624,8 @@ const InventoryDashboard = () => {
                     name="location"
                     value={formData.location}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
+                    disabled={submitLoading}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 disabled:bg-gray-50"
                   >
                     <option value="" disabled className="text-gray-500">Select warehouse</option>
                     <option value="Warehouse 1" className="text-gray-900">Warehouse 1</option>
@@ -578,12 +643,13 @@ const InventoryDashboard = () => {
                   </label>
                   <input
                     type="number"
-                    name="available"
-                    value={formData.available}
+                    name="available_quantity"
+                    value={formData.available_quantity}
                     onChange={handleInputChange}
                     placeholder="0"
                     min="0"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    disabled={submitLoading}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500 disabled:bg-gray-50"
                   />
                 </div>
 
@@ -594,12 +660,13 @@ const InventoryDashboard = () => {
                   </label>
                   <input
                     type="number"
-                    name="reserved"
-                    value={formData.reserved}
+                    name="reserved_quantity"
+                    value={formData.reserved_quantity}
                     onChange={handleInputChange}
                     placeholder="0"
                     min="0"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    disabled={submitLoading}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500 disabled:bg-gray-50"
                   />
                 </div>
 
@@ -610,32 +677,43 @@ const InventoryDashboard = () => {
                   </label>
                   <input
                     type="number"
-                    name="onHand"
-                    value={formData.onHand}
+                    name="on_hand_quantity"
+                    value={formData.on_hand_quantity}
                     onChange={handleInputChange}
                     placeholder="0"
                     min="0"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    disabled={submitLoading}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 placeholder-gray-500 disabled:bg-gray-50"
                   />
                 </div>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3 bg-gray-50 flex-shrink-0">
               <button
-                type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                disabled={submitLoading}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleSubmit}
-                className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all duration-200 font-medium shadow-lg"
+                disabled={submitLoading}
+                className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
-                Add Inventory
+                {submitLoading ? (
+                  <>
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} className="mr-2" />
+                    Add Item
+                  </>
+                )}
               </button>
             </div>
           </div>
